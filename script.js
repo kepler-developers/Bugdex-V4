@@ -143,6 +143,29 @@ const langDict = {
   }
 };
 
+// Extract token + username from URL after GitHub login
+const params = new URLSearchParams(window.location.search);
+const token = params.get('token');
+const username = params.get('username');
+
+if (token && username) {
+  localStorage.setItem('token', token);
+  localStorage.setItem('username', username);
+
+  // Clean up the URL
+  window.history.replaceState({}, document.title, "/index.html");
+
+  // Optionally fetch and render the user profile
+  fetchUserProfile(username).then(profile => {
+    if (profile) {
+      // Do something with the profile, like update UI
+      document.getElementById("username-display").textContent = profile.username;
+      // etc...
+    }
+  });
+}
+
+
 // 获取所有帖子
 async function fetchPosts(page=1, pageSize=10) {
   try {
@@ -1057,6 +1080,7 @@ setLang(localStorage.getItem('lang') || 'zh');
 // Supabase相关代码已移除，如需实现注册/登录功能，请在此处接入你自己的后端API。
 
 const loginRegisterBtn = document.getElementById('loginRegisterBtn');
+const ghLogin = document.getElementById('ghLogin');
 const authModal = document.getElementById('authModal');
 const loginTab = document.getElementById('loginTab');
 const registerTab = document.getElementById('registerTab');
@@ -1319,6 +1343,7 @@ function setUserInfo(user) {
   
   userInfo.style.display = '';
   loginRegisterBtn.style.display = 'none';
+  ghLogin.style.display = 'none';
   userNickname.textContent = user.username;
   userAvatar.src = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.username)}`;
   

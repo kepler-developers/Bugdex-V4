@@ -12,14 +12,20 @@
     "edgeone:deploy": "edgeone deploy",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["forum", "bugdex", "edgeone", "serverless"],
+  "keywords": [
+    "forum",
+    "bugdex",
+    "edgeone",
+    "serverless"
+  ],
   "author": "BugDex Team",
   "license": "MIT",
   "dependencies": {
-    "serve": "^14.2.1",
-    "express": "^4.18.2",
+    "concurrently": "^8.2.2",
     "cors": "^2.8.5",
-    "concurrently": "^8.2.2"
+    "express": "^4.18.2",
+    "node-fetch": "^3.3.2",
+    "serve": "^14.2.1"
   },
   "devDependencies": {
     "edgeone": "latest"

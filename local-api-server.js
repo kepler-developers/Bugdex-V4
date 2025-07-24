@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fetch = require('node-fetch');
+const { Request } = fetch;
 
 const app = express();
 const PORT = 3001;
@@ -10,8 +12,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('.'));
 
+// Require your handlers (adjust path if needed)
+const githubLoginHandler = require('./api/auth/github/login.js');
+const githubCallbackHandler = require('./api/auth/github/callback.js');
+
 // 模拟数据存储
-const tempStorage = {
+global.tempStorage = {
   users: new Map(),
   posts: new Map(),
   likes: new Map(),
@@ -20,21 +26,21 @@ const tempStorage = {
 };
 
 // 添加测试用户数据
-tempStorage.users.set('admin', {
+global.tempStorage.users.set('admin', {
   username: 'admin',
   email: 'admin@test.com',
   password: 'admin123',
   bio: '管理员账号'
 });
 
-tempStorage.users.set('test', {
+global.tempStorage.users.set('test', {
   username: 'test',
   email: 'test@test.com',
   password: 'test123',
   bio: '测试账号'
 });
 
-tempStorage.users.set('user', {
+global.tempStorage.users.set('user', {
   username: 'user',
   email: 'user@test.com',
   password: 'user123',
@@ -86,8 +92,34 @@ const testPosts = [
 ];
 
 testPosts.forEach(post => {
-  tempStorage.posts.set(post.id, post);
+  global.tempStorage.posts.set(post.id, post);
 });
+
+// Requests Wrapper
+// Adapter function: wrap your onRequest handler to work with Express
+function expressWrapper(handler) {
+  return async (req, res) => {
+    try {
+      // Wrap Express req in a Fetch API Request-like object
+      const request = new Request(`http://${req.headers.host}${req.url}`, {
+        method: req.method,
+        headers: req.headers,
+        body: req.method === 'GET' || req.method === 'HEAD' ? null : req.body,
+      });
+
+      // Call your original handler (assuming onRequest)
+      const response = await handler.onRequest({ request });
+
+      // Forward response headers/status/body to Express res
+      res.status(response.status);
+      response.headers.forEach((value, key) => res.setHeader(key, value));
+      const text = await response.text();
+      res.send(text);
+    } catch (err) {
+      res.status(500).send(err.message);
+    }
+  };
+}
 
 // API路由
 
@@ -102,12 +134,20 @@ app.get('/api/test', (req, res) => {
   });
 });
 
+// Register routes
+app.all('/api/auth/github/login', expressWrapper(githubLoginHandler));
+app.all('/api/auth/github/callback', expressWrapper(githubCallbackHandler));
+
+// app.listen(PORT, () => {
+//   console.log(`API server listening at http://localhost:${PORT}`);
+// });
+
 // 登录接口
 app.post('/api/login', (req, res) => {
   try {
     const { username, password } = req.body;
     
-    const user = tempStorage.users.get(username);
+    const user = global.tempStorage.users.get(username);
     
     if (user && user.password === password) {
       // 生成简单的token
@@ -138,6 +178,8 @@ app.post('/api/login', (req, res) => {
   }
 });
 
+
+
 // 发送邮箱验证码
 app.post('/api/send_email_code', (req, res) => {
   try {
@@ -147,7 +189,7 @@ app.post('/api/send_email_code', (req, res) => {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expires_at = Date.now() + 5 * 60 * 1000; // 5分钟过期
     
-    tempStorage.codes.set(email, {
+    global.tempStorage.codes.set(email, {
       code,
       expires_at
     });
@@ -171,7 +213,7 @@ app.post('/api/register', (req, res) => {
     const { username, email, password, code } = req.body;
     
     // 验证邮箱验证码
-    const codeData = tempStorage.codes.get(email);
+    const codeData = global.tempStorage.codes.get(email);
     
     if (!codeData || codeData.code !== code) {
       return res.status(400).json({
@@ -189,7 +231,7 @@ app.post('/api/register', (req, res) => {
     }
     
     // 检查用户是否已存在
-    if (tempStorage.users.has(username)) {
+    if (global.tempStorage.users.has(username)) {
       return res.status(400).json({
         success: false,
         message: '用户名已存在'
@@ -205,10 +247,10 @@ app.post('/api/register', (req, res) => {
       created_at: new Date().toISOString()
     };
     
-    tempStorage.users.set(username, newUser);
+    global.tempStorage.users.set(username, newUser);
     
     // 清除验证码
-    tempStorage.codes.delete(email);
+    global.tempStorage.codes.delete(email);
     
     res.json({
       success: true,
@@ -229,7 +271,7 @@ app.get('/api/posts', (req, res) => {
     const page = Number(req.query.page) || 1;
     const size = Number(req.query.size) || 10;
     
-    const posts = Array.from(tempStorage.posts.values());
+    const posts = Array.from(global.tempStorage.posts.values());
     posts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     
     const pagedPosts = posts.slice((page-1)*size, page*size);
@@ -272,7 +314,7 @@ app.post('/api/posts', (req, res) => {
       created_at: new Date().toISOString()
     };
     
-    tempStorage.posts.set(postId, post);
+    global.tempStorage.posts.set(postId, post);
     
     res.json(post);
   } catch (error) {
@@ -298,7 +340,7 @@ app.post('/api/posts/:id/like', (req, res) => {
     const payload = JSON.parse(Buffer.from(token.split('.')[0], 'base64').toString());
     
     const postId = req.params.id;
-    const post = tempStorage.posts.get(postId);
+    const post = global.tempStorage.posts.get(postId);
     
     if (!post) {
       return res.status(404).json({
@@ -309,7 +351,7 @@ app.post('/api/posts/:id/like', (req, res) => {
     
     // 检查是否已经点赞
     const likeKey = `${postId}:${payload.username}`;
-    if (tempStorage.likes.has(likeKey)) {
+    if (global.tempStorage.likes.has(likeKey)) {
       return res.status(400).json({
         success: false,
         message: '已经点赞过了'
@@ -317,7 +359,7 @@ app.post('/api/posts/:id/like', (req, res) => {
     }
     
     // 添加点赞记录
-    tempStorage.likes.set(likeKey, {
+    global.tempStorage.likes.set(likeKey, {
       post_id: postId,
       username: payload.username,
       created_at: new Date().toISOString()
@@ -363,7 +405,7 @@ app.post('/api/posts/:id/comments', (req, res) => {
       created_at: new Date().toISOString()
     };
     
-    tempStorage.comments.set(commentId, comment);
+    global.tempStorage.comments.set(commentId, comment);
     
     res.json(comment);
   } catch (error) {
@@ -386,7 +428,7 @@ app.get('/api/user/profile', (req, res) => {
       });
     }
     
-    const user = tempStorage.users.get(username);
+    const user = global.tempStorage.users.get(username);
     
     if (!user) {
       return res.status(404).json({
@@ -396,7 +438,7 @@ app.get('/api/user/profile', (req, res) => {
     }
     
     // 获取用户的帖子
-    const posts = Array.from(tempStorage.posts.values())
+    const posts = Array.from(global.tempStorage.posts.values())
       .filter(post => post.username === username);
     
     res.json({
@@ -428,7 +470,7 @@ app.put('/api/user/profile', (req, res) => {
     
     const { username, bio } = req.body;
     
-    const user = tempStorage.users.get(payload.username);
+    const user = global.tempStorage.users.get(payload.username);
     
     if (!user) {
       return res.status(404).json({
@@ -459,7 +501,7 @@ app.get('/api/weekly', (req, res) => {
     const userStats = {};
     
     // 统计每个用户的发帖数
-    const posts = Array.from(tempStorage.posts.values());
+    const posts = Array.from(global.tempStorage.posts.values());
     
     for (const post of posts) {
       const username = post.username;
@@ -485,7 +527,7 @@ app.get('/api/weekly', (req, res) => {
 app.get('/api/search/posts', (req, res) => {
   try {
     const keyword = req.query.keyword || '';
-    const posts = Array.from(tempStorage.posts.values());
+    const posts = Array.from(global.tempStorage.posts.values());
     
     const lower = keyword.toLowerCase();
     const filtered = posts.filter(post =>
@@ -508,7 +550,7 @@ app.get('/api/search/posts', (req, res) => {
 app.get('/api/search/users', (req, res) => {
   try {
     const keyword = req.query.keyword || '';
-    const users = Array.from(tempStorage.users.values());
+    const users = Array.from(global.tempStorage.users.values());
     
     const lower = keyword.toLowerCase();
     const filtered = users.filter(user =>
