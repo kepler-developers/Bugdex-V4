@@ -1,0 +1,24 @@
+{
+  "name": "bugdex-forum",
+  "version": "1.0.0",
+  "description": "BugDex 论坛 - EdgeOne Pages 版本",
+  "main": "index.html",
+  "scripts": {
+    "dev": "edgeone dev",
+    "build": "edgeone build",
+    "deploy": "edgeone deploy"
+  },
+  "dependencies": {
+    "edgeone": "latest"
+  },
+  "functions": {
+    "api/*.js": {
+      "runtime": "edgeone"
+    }
+  },
+  "kv": {
+    "bugdex_kv": {
+      "namespace": "bugdex_data"
+    }
+  }
+} 

@@ -1,0 +1,27 @@
+{
+  "name": "bugdex-forum",
+  "version": "1.0.0",
+  "description": "BugDex 论坛 - 动态版本",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx serve . -p 3000",
+    "start": "npx serve . -p 3000",
+    "api": "node local-api-server.js",
+    "dev:full": "concurrently \"npm run api\" \"npm run dev\"",
+    "edgeone:dev": "edgeone dev",
+    "edgeone:deploy": "edgeone deploy",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["forum", "bugdex", "edgeone", "serverless"],
+  "author": "BugDex Team",
+  "license": "MIT",
+  "dependencies": {
+    "serve": "^14.2.1",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "concurrently": "^8.2.2"
+  },
+  "devDependencies": {
+    "edgeone": "latest"
+  }
+}
